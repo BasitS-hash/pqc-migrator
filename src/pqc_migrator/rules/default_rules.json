@@ -1,0 +1,146 @@
+{
+  "$schema": "internal://pqc-migrator/rules",
+  "version": "1.0.0",
+  "references": {
+    "fips_203": "NIST FIPS 203 (ML-KEM) — finalized 2024-08-13",
+    "fips_204": "NIST FIPS 204 (ML-DSA) — finalized 2024-08-13",
+    "fips_205": "NIST FIPS 205 (SLH-DSA) — finalized 2024-08-13",
+    "cnsa_2_0": "NSA CNSA 2.0 suite: ML-KEM, ML-DSA, AES-256, SHA-384/512"
+  },
+  "rules": [
+    {
+      "rule_id": "PQC001",
+      "primitive": "RSA",
+      "category": "public-key-encryption",
+      "severity": "critical",
+      "message": "RSA key generation / encryption is quantum-vulnerable (Shor's algorithm breaks the integer-factorization assumption).",
+      "recommendation": "For key establishment, migrate to ML-KEM-768 (FIPS 203), ideally in a hybrid X25519+ML-KEM-768 construction during transition.",
+      "cnsa_note": "CNSA 2.0 mandates ML-KEM for key establishment; RSA is not approved for NSS post-transition.",
+      "patterns": [
+        {"regex": "\\bRSA\\.generate\\b", "languages": ["python"]},
+        {"regex": "\\brsa\\.generate_private_key\\b", "languages": ["python"]},
+        {"regex": "\\bgenerateKeyPairSync?\\s*\\(\\s*['\"]rsa['\"]", "languages": ["javascript", "typescript"]},
+        {"regex": "\\brsa\\.GenerateKey\\b", "languages": ["go"]},
+        {"regex": "\\bKeyPairGenerator\\.getInstance\\s*\\(\\s*\"RSA\"", "languages": ["java"]},
+        {"regex": "(?<![A-Za-z0-9_-])RSA[-_]?(1024|2048|3072|4096)(?![A-Za-z0-9])", "languages": ["config"]}
+      ]
+    },
+    {
+      "rule_id": "PQC002",
+      "primitive": "ECDSA",
+      "category": "signature",
+      "severity": "high",
+      "message": "ECDSA signatures are quantum-vulnerable (Shor's algorithm breaks the elliptic-curve discrete-log assumption).",
+      "recommendation": "Migrate signing to ML-DSA (FIPS 204); use SLH-DSA (FIPS 205) where a conservative hash-based backup is preferred.",
+      "cnsa_note": "CNSA 2.0 mandates ML-DSA for signatures; ECDSA is not approved for NSS post-transition.",
+      "patterns": [
+        {"regex": "\\bec\\.generate_private_key\\b", "languages": ["python"]},
+        {"regex": "\\becdsa\\b", "languages": ["python", "go"]},
+        {"regex": "\\bECDSA\\b", "languages": ["javascript", "typescript", "java"]},
+        {"regex": "\\becdsa\\.GenerateKey\\b", "languages": ["go"]},
+        {"regex": "(?<![A-Za-z0-9_-])ecdsa[-_](sha2|sha256|sha384|sha512|nistp256|nistp384)", "languages": ["config"]}
+      ]
+    },
+    {
+      "rule_id": "PQC003",
+      "primitive": "ECDH",
+      "category": "key-exchange",
+      "severity": "critical",
+      "message": "ECDH key exchange is quantum-vulnerable and exposed to Harvest-Now-Decrypt-Later: recorded sessions can be decrypted once a CRQC exists.",
+      "recommendation": "Adopt hybrid X25519+ML-KEM-768 key agreement (IANA group X25519MLKEM768, codepoint 0x11ec) during transition, then ML-KEM-768.",
+      "cnsa_note": "CNSA 2.0 mandates ML-KEM for key establishment.",
+      "patterns": [
+        {"regex": "\\bECDH\\b", "languages": ["python", "javascript", "typescript", "java", "go"]},
+        {"regex": "\\bcrypto\\.createECDH\\b", "languages": ["javascript", "typescript"]},
+        {"regex": "\\becdh\\b", "languages": ["python", "go"]}
+      ]
+    },
+    {
+      "rule_id": "PQC004",
+      "primitive": "DH",
+      "category": "key-exchange",
+      "severity": "critical",
+      "message": "Finite-field Diffie-Hellman is quantum-vulnerable and exposed to Harvest-Now-Decrypt-Later.",
+      "recommendation": "Replace with ML-KEM-768 (FIPS 203) key establishment, hybridized with X25519 during transition.",
+      "cnsa_note": "CNSA 2.0 mandates ML-KEM for key establishment.",
+      "patterns": [
+        {"regex": "\\bDHParameterNumbers\\b", "languages": ["python"]},
+        {"regex": "\\bdh\\.generate_parameters\\b", "languages": ["python"]},
+        {"regex": "\\bcrypto\\.createDiffieHellman\\b", "languages": ["javascript", "typescript"]},
+        {"regex": "\\bdiffie[-_ ]?hellman\\b", "languages": ["config"]}
+      ]
+    },
+    {
+      "rule_id": "PQC005",
+      "primitive": "DSA",
+      "category": "signature",
+      "severity": "high",
+      "message": "DSA signatures rely on the discrete-log assumption and are quantum-vulnerable.",
+      "recommendation": "Migrate signing to ML-DSA (FIPS 204) or SLH-DSA (FIPS 205).",
+      "cnsa_note": "CNSA 2.0 mandates ML-DSA for signatures.",
+      "patterns": [
+        {"regex": "\\bdsa\\.generate_private_key\\b", "languages": ["python"]},
+        {"regex": "\\bDSA\\.generate\\b", "languages": ["python"]},
+        {"regex": "\\bdsa\\.GenerateKey\\b", "languages": ["go"]},
+        {"regex": "KeyPairGenerator\\.getInstance\\s*\\(\\s*\"DSA\"", "languages": ["java"]}
+      ]
+    },
+    {
+      "rule_id": "PQC006",
+      "primitive": "MD5",
+      "category": "hash",
+      "severity": "high",
+      "message": "MD5 is a broken hash (collisions) and is not quantum-resistant at any usable strength.",
+      "recommendation": "Use SHA-384 or SHA-512 (SHA-2 family) per CNSA 2.0; SHA-3 is also acceptable.",
+      "cnsa_note": "CNSA 2.0 mandates SHA-384 (or stronger) for hashing.",
+      "patterns": [
+        {"regex": "\\bhashlib\\.md5\\b", "languages": ["python"]},
+        {"regex": "\\bmd5\\.(New|Sum)\\b", "languages": ["go"]},
+        {"regex": "MessageDigest\\.getInstance\\s*\\(\\s*\"MD5\"", "languages": ["java"]},
+        {"regex": "createHash\\s*\\(\\s*['\"]md5['\"]", "languages": ["javascript", "typescript"]}
+      ]
+    },
+    {
+      "rule_id": "PQC007",
+      "primitive": "SHA-1",
+      "category": "hash",
+      "severity": "medium",
+      "message": "SHA-1 is broken against collision attacks and below CNSA 2.0 strength.",
+      "recommendation": "Use SHA-384 or SHA-512 per CNSA 2.0.",
+      "cnsa_note": "CNSA 2.0 mandates SHA-384 (or stronger).",
+      "patterns": [
+        {"regex": "\\bhashlib\\.sha1\\b", "languages": ["python"]},
+        {"regex": "\\bsha1\\.(New|Sum)\\b", "languages": ["go"]},
+        {"regex": "MessageDigest\\.getInstance\\s*\\(\\s*\"SHA-?1\"", "languages": ["java"]},
+        {"regex": "createHash\\s*\\(\\s*['\"]sha1['\"]", "languages": ["javascript", "typescript"]}
+      ]
+    },
+    {
+      "rule_id": "PQC008",
+      "primitive": "3DES",
+      "category": "symmetric",
+      "severity": "medium",
+      "message": "Triple-DES has a small effective key size and is deprecated; not CNSA 2.0 compliant.",
+      "recommendation": "Use AES-256-GCM per CNSA 2.0 (Grover's algorithm only halves symmetric strength, so AES-256 retains ~128-bit security).",
+      "cnsa_note": "CNSA 2.0 mandates AES-256 for symmetric encryption.",
+      "patterns": [
+        {"regex": "\\bTripleDES\\b", "languages": ["python", "javascript", "typescript", "java"]},
+        {"regex": "\\bDES3\\b", "languages": ["python"]},
+        {"regex": "\\bdes-ede3\\b", "languages": ["config"]},
+        {"regex": "Cipher\\.getInstance\\s*\\(\\s*\"DESede", "languages": ["java"]}
+      ]
+    },
+    {
+      "rule_id": "PQC009",
+      "primitive": "X.509 certificate (classical signature)",
+      "category": "certificate",
+      "severity": "high",
+      "message": "Certificate artifact present; its signature algorithm and public key may be quantum-vulnerable (RSA/ECDSA).",
+      "recommendation": "Inventory certificate signature algorithms and key types; plan reissuance with ML-DSA once your PKI supports FIPS 204.",
+      "cnsa_note": "CNSA 2.0 mandates ML-DSA for signing, including code-signing and PKI, by the 2030-2033 window.",
+      "patterns": [
+        {"regex": "-----BEGIN (CERTIFICATE|RSA PRIVATE KEY|EC PRIVATE KEY|PRIVATE KEY)-----", "languages": ["config", "cert"]}
+      ]
+    }
+  ]
+}
