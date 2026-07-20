@@ -98,6 +98,25 @@ def test_sorted_findings_orders_by_severity(
     assert ranks == sorted(ranks, reverse=True)
 
 
+def test_single_file_scan_reports_file_name_not_dot(
+    scanner: CodebaseScanner, fixtures_dir: Path
+) -> None:
+    # Regression: scanning a single file reported "." as the location because
+    # relative_to(file) yields ".". Findings must carry the real file name.
+    result = scanner.scan_path(fixtures_dir / "vulnerable_app.js")
+    assert result.has_findings
+    paths = {f.file_path for f in result.findings}
+    assert paths == {"vulnerable_app.js"}
+
+
+def test_directory_scan_reports_paths_relative_to_root(
+    scanner: CodebaseScanner, fixtures_dir: Path
+) -> None:
+    result = scanner.scan_path(fixtures_dir)
+    js_paths = {f.file_path for f in result.findings if f.file_path.endswith(".js")}
+    assert "vulnerable_app.js" in js_paths
+
+
 def test_default_engine_construction() -> None:
     # CodebaseScanner with no engine uses defaults.
     scanner = CodebaseScanner()

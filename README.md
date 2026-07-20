@@ -61,8 +61,12 @@ Requires Python 3.11+.
 
 ### Scan a codebase
 
+`scan` accepts either a directory (walked recursively, skipping VCS/venv/build
+noise) or a single file:
+
 ```bash
-pqc-migrator scan ./my-project
+pqc-migrator scan ./my-project        # walk a whole tree
+pqc-migrator scan ./keys/issue.py     # scan one file
 ```
 
 ```
