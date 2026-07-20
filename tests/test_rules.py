@@ -82,6 +82,40 @@ def test_scan_text_detects_go_rsa(engine: RuleEngine) -> None:
     assert any(f.rule_id == "PQC001" for f in findings)
 
 
+def test_scan_text_detects_node_async_generate_keypair_rsa(
+    engine: RuleEngine,
+) -> None:
+    # Regression: the pattern used ``Sync?`` (optional trailing 'c'), which only
+    # matched generateKeyPairSync and missed the async crypto.generateKeyPair.
+    source = "const kp = crypto.generateKeyPair('rsa', { modulusLength: 2048 });\n"
+    findings = engine.scan_text(source, "x.js", "javascript")
+    assert any(f.rule_id == "PQC001" for f in findings)
+
+
+def test_scan_text_detects_node_generate_keypair_sync_rsa(engine: RuleEngine) -> None:
+    source = "const kp = crypto.generateKeyPairSync('rsa', {});\n"
+    findings = engine.scan_text(source, "x.js", "javascript")
+    assert any(f.rule_id == "PQC001" for f in findings)
+
+
+def test_scan_text_detects_node_ec_keypair_generation(engine: RuleEngine) -> None:
+    source = "const kp = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });\n"
+    findings = engine.scan_text(source, "x.ts", "typescript")
+    assert any(f.rule_id == "PQC002" for f in findings)
+
+
+def test_scan_text_detects_ssh_rsa_host_key_algorithms(engine: RuleEngine) -> None:
+    # Regression: SSH RSA references (ssh-rsa, rsa-sha2-*, ssh_host_rsa_2048_key)
+    # were not flagged because the size pattern excluded a leading '_' and had
+    # no algorithm-name pattern.
+    for line in (
+        "PubkeyAcceptedAlgorithms ssh-rsa,rsa-sha2-512",
+        "HostKey /etc/ssh/ssh_host_rsa_2048_key",
+    ):
+        findings = engine.scan_text(line, "sshd_config", "config")
+        assert any(f.rule_id == "PQC001" for f in findings), line
+
+
 def test_scan_text_is_language_scoped(engine: RuleEngine) -> None:
     # The Go rsa.GenerateKey pattern should not fire for the 'java' language.
     source = "key, _ := rsa.GenerateKey(rand.Reader, 2048)\n"

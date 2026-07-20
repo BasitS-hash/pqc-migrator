@@ -34,6 +34,27 @@ def test_detects_ec_private_key_and_curve() -> None:
     assert ids.count("PQC002") >= 1
 
 
+def test_ec_generate_private_key_is_not_double_counted() -> None:
+    # Regression: ec.generate_private_key(ec.SECP256R1()) matched both the call
+    # signature and the curve-name attribute, yielding two PQC002 findings for
+    # a single key generation (and inflating CBOM occurrence counts).
+    src = (
+        "from cryptography.hazmat.primitives.asymmetric import ec\n"
+        "k = ec.generate_private_key(ec.SECP256R1())\n"
+    )
+    assert _scan(src).count("PQC002") == 1
+
+
+def test_standalone_curve_reference_is_still_detected() -> None:
+    # A bare curve reference (not an argument to a detected key-gen call) must
+    # still be flagged, so the double-count fix does not suppress real signal.
+    src = (
+        "from cryptography.hazmat.primitives.asymmetric import ec\n"
+        "CURVE = ec.SECP384R1()\n"
+    )
+    assert "PQC002" in _scan(src)
+
+
 def test_detects_ecdh() -> None:
     src = (
         "from cryptography.hazmat.primitives.asymmetric import ec\nshared = ec.ECDH()\n"
