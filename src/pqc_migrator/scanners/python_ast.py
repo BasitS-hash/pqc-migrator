@@ -71,6 +71,11 @@ class _Visitor(ast.NodeVisitor):
         self._file_path = file_path
         self._lines = source_lines
         self.findings: list[Finding] = []
+        # (rule_id, line) pairs already emitted by a *call* match, used to
+        # suppress redundant curve-attribute findings for the same statement,
+        # e.g. ``ec.generate_private_key(ec.SECP256R1())`` must not report the
+        # single key generation twice.
+        self._call_finding_keys: set[tuple[str, int]] = set()
 
     def _snippet(self, lineno: int) -> str:
         index = lineno - 1
@@ -78,12 +83,14 @@ class _Visitor(ast.NodeVisitor):
             return self._lines[index].strip()[:200]
         return ""
 
-    def _emit(self, rule_id: str, node: ast.AST) -> None:
+    def _emit(self, rule_id: str, node: ast.AST, *, from_call: bool = False) -> None:
         rule = self._engine.rule_for(rule_id)
         if rule is None:
             return
         lineno = getattr(node, "lineno", 1)
         col = getattr(node, "col_offset", 0) + 1
+        if from_call:
+            self._call_finding_keys.add((rule_id, lineno))
         self.findings.append(
             Finding(
                 rule_id=rule.rule_id,
@@ -107,7 +114,7 @@ class _Visitor(ast.NodeVisitor):
             for signature in _CALL_SIGNATURES:
                 length = len(signature.suffix)
                 if tuple(parts[-length:]) == signature.suffix:
-                    self._emit(signature.rule_id, node)
+                    self._emit(signature.rule_id, node, from_call=True)
                     break
             else:
                 self._check_hashlib_new(parts, node)
@@ -129,7 +136,11 @@ class _Visitor(ast.NodeVisitor):
     def visit_Attribute(self, node: ast.Attribute) -> None:
         # Reference to an EC curve (e.g. ec.SECP256R1) implies ECDSA/ECDH.
         if node.attr.upper() in _EC_CURVE_NAMES:
-            self._emit("PQC002", node)
+            lineno = getattr(node, "lineno", 1)
+            # Skip when a key-generation call on this line already produced the
+            # finding — the curve is that call's argument, not a separate use.
+            if ("PQC002", lineno) not in self._call_finding_keys:
+                self._emit("PQC002", node)
         self.generic_visit(node)
 
 

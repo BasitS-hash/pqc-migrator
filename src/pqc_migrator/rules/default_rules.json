@@ -19,10 +19,11 @@
       "patterns": [
         {"regex": "\\bRSA\\.generate\\b", "languages": ["python"]},
         {"regex": "\\brsa\\.generate_private_key\\b", "languages": ["python"]},
-        {"regex": "\\bgenerateKeyPairSync?\\s*\\(\\s*['\"]rsa['\"]", "languages": ["javascript", "typescript"]},
+        {"regex": "\\bgenerateKeyPair(Sync)?\\s*\\(\\s*['\"]rsa['\"]", "languages": ["javascript", "typescript"]},
         {"regex": "\\brsa\\.GenerateKey\\b", "languages": ["go"]},
         {"regex": "\\bKeyPairGenerator\\.getInstance\\s*\\(\\s*\"RSA\"", "languages": ["java"]},
-        {"regex": "(?<![A-Za-z0-9_-])RSA[-_]?(1024|2048|3072|4096)(?![A-Za-z0-9])", "languages": ["config"]}
+        {"regex": "(?<![A-Za-z0-9])RSA[-_]?(1024|2048|3072|4096)(?![A-Za-z0-9])", "languages": ["config"]},
+        {"regex": "(?<![A-Za-z0-9])(ssh-rsa|rsa-sha2-(256|512))(?![A-Za-z0-9])", "languages": ["config"]}
       ]
     },
     {
@@ -37,6 +38,7 @@
         {"regex": "\\bec\\.generate_private_key\\b", "languages": ["python"]},
         {"regex": "\\becdsa\\b", "languages": ["python", "go"]},
         {"regex": "\\bECDSA\\b", "languages": ["javascript", "typescript", "java"]},
+        {"regex": "\\bgenerateKeyPair(Sync)?\\s*\\(\\s*['\"]ec['\"]", "languages": ["javascript", "typescript"]},
         {"regex": "\\becdsa\\.GenerateKey\\b", "languages": ["go"]},
         {"regex": "(?<![A-Za-z0-9_-])ecdsa[-_](sha2|sha256|sha384|sha512|nistp256|nistp384)", "languages": ["config"]}
       ]

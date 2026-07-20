@@ -131,6 +131,11 @@ class CodebaseScanner:
 
     @staticmethod
     def _display_path(file_path: Path, root_path: Path) -> str:
+        # When a single file is scanned, ``root_path`` *is* the file, so
+        # ``relative_to`` would yield "." — useless as a finding location.
+        # Report the file's own name in that case.
+        if root_path.is_file():
+            return file_path.name
         try:
             return str(file_path.relative_to(root_path))
         except ValueError:
